@@ -43,7 +43,7 @@ Creates a network generator instance.
 
 - `options`:
   - `createPeer: (id: Buffer) => Object`: Defines how to create the peer object.
-  - `createConnection: (peerFrom, peerTo) => Object`: Defines how to create a connection between peerFrom and peerTo. *It can return an optional stream.*
+  - `createConnection: (peerFrom, peerTo) => Object`: Defines how to create a connection between peerFrom and peerTo. **It can return an optional stream.**
 
 #### `const network = generator.balancedBinTree(n)`
 
