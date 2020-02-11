@@ -20,9 +20,9 @@ $ npm install @dxos/network-generator
 import { NetworkGenerator } from '@dxos/network-generator';
 
 const generator = new NetworkGenerator({
-  createPeer(nodeId) {
-    // defines the peer object for the network
-    return { name: `peer${nodeId}` };
+  createPeer(id) {
+    // defines the peer object for the network. An "id" is required.
+    return { id, name: `peer${nodeId}` };
   }
   createConnection(peerFrom, peerTo) {
     // do something to connect peerFrom <--> peerTo
