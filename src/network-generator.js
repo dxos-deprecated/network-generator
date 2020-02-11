@@ -107,10 +107,10 @@ export class Network extends EventEmitter {
     const peerFrom = this._graph.getNode(fromHex);
     const peerTo = this._graph.getNode(toHex);
 
-    const connection = this._createConnection(peerFrom.data, peerTo.data);
+    const connection = this._createConnection(peerFrom.data, peerTo.data) || new PassThrough();
 
-    if (!connection.pipe) {
-      throw new Error('createConnection expect a stream');
+    if (!(typeof connection === 'object' && typeof connection.pipe === 'function')) {
+      throw new Error('createConnection expect to return a stream');
     }
 
     const link = this._graph.addLink(fromHex, toHex, connection);
