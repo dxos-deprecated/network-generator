@@ -5,12 +5,29 @@
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import assert from 'assert';
+import crypto from 'crypto';
 
 import createGraph from 'ngraph.graph';
 import graphGenerators from 'ngraph.generators';
 import eos from 'end-of-stream';
 
 const topologies = ['ladder', 'complete', 'completeBipartite', 'balancedBinTree', 'path', 'circularLadder', 'grid', 'grid3', 'noLinks', 'cliqueCircle', 'wattsStrogatz'];
+
+class IdGenerator {
+  constructor () {
+    this._ids = new Map();
+  }
+
+  get (id) {
+    if (this._ids.has(id)) {
+      return this._ids.get(id);
+    }
+
+    const newId = crypto.randomBytes(32);
+    this._ids.set(id, newId);
+    return newId;
+  }
+}
 
 /**
  * Network.
@@ -74,7 +91,7 @@ export class Network extends EventEmitter {
       throw new Error('createPeer expect to return an object with an "id" buffer prop.');
     }
 
-    this._graph.addNode(id.toString(), peer);
+    this._graph.addNode(id.toString('hex'), peer);
     return peer;
   }
 
@@ -82,10 +99,13 @@ export class Network extends EventEmitter {
     assert(Buffer.isBuffer(from));
     assert(Buffer.isBuffer(to));
 
-    if (!this._graph.hasNode(from.toString())) this.addPeer(from);
-    if (!this._graph.hasNode(to.toString())) this.addPeer(to);
-    const peerFrom = this._graph.getNode(from.toString());
-    const peerTo = this._graph.getNode(to.toString());
+    const fromHex = from.toString('hex');
+    const toHex = to.toString('hex');
+
+    if (!this._graph.hasNode(fromHex)) this.addPeer(from);
+    if (!this._graph.hasNode(toHex)) this.addPeer(to);
+    const peerFrom = this._graph.getNode(fromHex);
+    const peerTo = this._graph.getNode(toHex);
 
     const connection = this._createConnection(peerFrom.data, peerTo.data);
 
@@ -93,7 +113,7 @@ export class Network extends EventEmitter {
       throw new Error('createConnection expect a stream');
     }
 
-    const link = this._graph.addLink(from.toString(), to.toString(), connection);
+    const link = this._graph.addLink(fromHex, toHex, connection);
     eos(connection, () => {
       this._graph.removeLink(link);
     });
@@ -104,27 +124,29 @@ export class Network extends EventEmitter {
   deletePeer (id) {
     assert(Buffer.isBuffer(id));
 
-    if (!this._graph.hasNode(id.toString())) {
-      throw new Error(`Peer ${id.toString()} not found`);
+    const idHex = id.toString('hex');
+
+    if (!this._graph.hasNode(idHex)) {
+      throw new Error(`Peer ${idHex} not found`);
     }
 
-    this._graph.removeNode(id.toString());
-    this._graph.forEachLinkedNode(id.toString(), (_, link) => {
+    this._graph.removeNode(idHex);
+    this._graph.forEachLinkedNode(idHex, (_, link) => {
       this._destroyLink(link);
     });
   }
 
   deleteConnection (from, to) {
-    from = from.toString();
-    to = to.toString();
+    const fromHex = from.toString('hex');
+    const toHex = to.toString('hex');
 
-    this._graph.forEachLinkedNode(from, (_, link) => {
-      if (link.fromId === from && link.toId === to) this._destroyLink(link);
-      if (link.toId === from && link.fromId === to) this._destroyLink(link);
+    this._graph.forEachLinkedNode(fromHex, (_, link) => {
+      if (link.fromId === fromHex && link.toId === toHex) this._destroyLink(link);
+      if (link.toId === fromHex && link.fromId === toHex) this._destroyLink(link);
     });
-    this._graph.forEachLinkedNode(to, (_, link) => {
-      if (link.fromId === from && link.toId === to) this._destroyLink(link);
-      if (link.toId === from && link.fromId === to) this._destroyLink(link);
+    this._graph.forEachLinkedNode(toHex, (_, link) => {
+      if (link.fromId === fromHex && link.toId === toHex) this._destroyLink(link);
+      if (link.toId === fromHex && link.fromId === toHex) this._destroyLink(link);
     });
   }
 
@@ -148,14 +170,15 @@ export class NetworkGenerator {
    */
   constructor (options = {}) {
     const generator = graphGenerators.factory(() => {
+      const idGenerator = new IdGenerator();
       const network = new Network(options);
       return {
         network,
-        addNode (nodeId) {
-          network.addPeer(Buffer.from(`${nodeId}`));
+        addNode (id) {
+          network.addPeer(idGenerator.get(id));
         },
         addLink (from, to) {
-          return network.addConnection(Buffer.from(`${from}`), Buffer.from(`${to}`)).link;
+          return network.addConnection(idGenerator.get(from), idGenerator.get(to)).link;
         },
         getNodesCount () {
           return network.graph.getNodesCount();
