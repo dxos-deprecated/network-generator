@@ -42,7 +42,7 @@ console.log(network.connections)
 Creates a network generator instance.
 
 - `options`:
-  - `createPeer: (nodeId: number) => Object`: Defines how to create the peer object.
+  - `createPeer: (id: Buffer) => Object`: Defines how to create the peer object.
   - `createConnection: (peerFrom, peerTo) => Object`: Defines how to create a connection between peerFrom and peerTo.
 
 #### `const network = generator.balancedBinTree(n)`

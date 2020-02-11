@@ -8,8 +8,8 @@ import waitForExpect from 'wait-for-expect';
 
 test('generate a grid topology', async () => {
   const generator = new NetworkGenerator({
-    createPeer (nodeId) {
-      return { id: nodeId, name: `peer${nodeId}` };
+    createPeer (id) {
+      return { id, name: `peer${id}` };
     }
   });
 

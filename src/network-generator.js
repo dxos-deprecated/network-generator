@@ -4,6 +4,7 @@
 
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
+import assert from 'assert';
 
 import createGraph from 'ngraph.graph';
 import graphGenerators from 'ngraph.generators';
@@ -58,29 +59,33 @@ export class Network extends EventEmitter {
   get connections () {
     const connections = [];
     this._graph.forEachLink(link => {
-      const peerFrom = this._graph.getNode(link.fromId);
-      const peerTo = this._graph.getNode(link.toId);
+      const peerFrom = this._graph.getNode(link.fromId).data;
+      const peerTo = this._graph.getNode(link.toId).data;
       connections.push({ peerFrom, peerTo, stream: link.data });
     });
     return connections;
   }
 
-  addPeer (nodeId) {
-    const peer = this._createPeer(nodeId);
+  addPeer (id) {
+    assert(Buffer.isBuffer(id));
 
-    if (peer.id === undefined || peer.id === null) {
-      throw new Error('createPeer expect to return an object with an "id" prop.');
+    const peer = this._createPeer(id);
+    if (!Buffer.isBuffer(peer.id)) {
+      throw new Error('createPeer expect to return an object with an "id" buffer prop.');
     }
 
-    this._graph.addNode(nodeId, peer);
+    this._graph.addNode(id.toString(), peer);
     return peer;
   }
 
   addConnection (from, to) {
-    if (!this._graph.hasNode(from)) this.addPeer(from);
-    if (!this._graph.hasNode(to)) this.addPeer(to);
-    const peerFrom = this._graph.getNode(from);
-    const peerTo = this._graph.getNode(to);
+    assert(Buffer.isBuffer(from));
+    assert(Buffer.isBuffer(to));
+
+    if (!this._graph.hasNode(from.toString())) this.addPeer(from);
+    if (!this._graph.hasNode(to.toString())) this.addPeer(to);
+    const peerFrom = this._graph.getNode(from.toString());
+    const peerTo = this._graph.getNode(to.toString());
 
     const connection = this._createConnection(peerFrom.data, peerTo.data);
 
@@ -88,7 +93,7 @@ export class Network extends EventEmitter {
       throw new Error('createConnection expect a stream');
     }
 
-    const link = this._graph.addLink(from, to, connection);
+    const link = this._graph.addLink(from.toString(), to.toString(), connection);
     eos(connection, () => {
       this._graph.removeLink(link);
     });
@@ -96,18 +101,23 @@ export class Network extends EventEmitter {
     return { peerFrom, peerTo, stream: connection };
   }
 
-  deletePeer (nodeId) {
-    if (!this._graph.hasNode(nodeId)) {
-      throw new Error(`Peer ${nodeId} not found`);
+  deletePeer (id) {
+    assert(Buffer.isBuffer(id));
+
+    if (!this._graph.hasNode(id.toString())) {
+      throw new Error(`Peer ${id.toString()} not found`);
     }
 
-    this._graph.removeNode(nodeId);
-    this._graph.forEachLinkedNode(nodeId, (_, link) => {
+    this._graph.removeNode(id.toString());
+    this._graph.forEachLinkedNode(id.toString(), (_, link) => {
       this._destroyLink(link);
     });
   }
 
   deleteConnection (from, to) {
+    from = from.toString();
+    to = to.toString();
+
     this._graph.forEachLinkedNode(from, (_, link) => {
       if (link.fromId === from && link.toId === to) this._destroyLink(link);
       if (link.toId === from && link.fromId === to) this._destroyLink(link);
@@ -142,10 +152,10 @@ export class NetworkGenerator {
       return {
         network,
         addNode (nodeId) {
-          network.addPeer(nodeId);
+          network.addPeer(Buffer.from(`${nodeId}`));
         },
         addLink (from, to) {
-          return network.addConnection(from, to).link;
+          return network.addConnection(Buffer.from(`${from}`), Buffer.from(`${to}`)).link;
         },
         getNodesCount () {
           return network.graph.getNodesCount();
