@@ -22,13 +22,13 @@ test('generate a grid topology', async () => {
   expect(conn1.stream).toBeInstanceOf(PassThrough);
 
   let connectionLength = network.connections.length;
-  network.deleteConnection(conn1.peerFrom.id, conn1.peerTo.id);
+  network.deleteConnection(conn1.fromPeer.id, conn1.toPeer.id);
   await waitForExpect(async () => {
     expect(network.connections.length).toBeLessThan(connectionLength);
   });
 
   connectionLength = network.connections.length;
-  network.deletePeer(network.connections[0].peerFrom.id);
+  network.deletePeer(network.connections[0].fromPeer.id);
   await waitForExpect(async () => {
     expect(network.connections.length).toBeLessThan(connectionLength);
   });

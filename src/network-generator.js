@@ -76,9 +76,9 @@ export class Network extends EventEmitter {
   get connections () {
     const connections = [];
     this._graph.forEachLink(link => {
-      const peerFrom = this._graph.getNode(link.fromId).data;
-      const peerTo = this._graph.getNode(link.toId).data;
-      connections.push({ peerFrom, peerTo, stream: link.data });
+      const fromPeer = this._graph.getNode(link.fromId).data;
+      const toPeer = this._graph.getNode(link.toId).data;
+      connections.push({ fromPeer, toPeer, stream: link.data });
     });
     return connections;
   }
@@ -104,10 +104,10 @@ export class Network extends EventEmitter {
 
     if (!this._graph.hasNode(fromHex)) this.addPeer(from);
     if (!this._graph.hasNode(toHex)) this.addPeer(to);
-    const peerFrom = this._graph.getNode(fromHex);
-    const peerTo = this._graph.getNode(toHex);
+    const fromPeer = this._graph.getNode(fromHex);
+    const toPeer = this._graph.getNode(toHex);
 
-    const connection = this._createConnection(peerFrom.data, peerTo.data) || new PassThrough();
+    const connection = this._createConnection(fromPeer.data, toPeer.data) || new PassThrough();
 
     if (!(typeof connection === 'object' && typeof connection.pipe === 'function')) {
       throw new Error('createConnection expect to return a stream');
@@ -118,7 +118,7 @@ export class Network extends EventEmitter {
       this._graph.removeLink(link);
     });
 
-    return { peerFrom, peerTo, stream: connection };
+    return { fromPeer, toPeer, stream: connection };
   }
 
   deletePeer (id) {
