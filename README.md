@@ -73,13 +73,13 @@ Adds a new peer to the network.
 
 Deletes a peer from the network.
 
-#### `network.addConnection(fromId, toId) -> Connection`
+#### `network.addConnection(from, to) -> Connection`
 
 Adds a new connection to the network.
 
 - `Connection: { peerFrom, peerTo, stream }`
 
-#### `network.deleteConnection(fromId, toId)`
+#### `network.deleteConnection(from, to)`
 
 Deletes a connection from the network.
 
