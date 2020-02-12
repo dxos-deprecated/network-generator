@@ -130,10 +130,10 @@ export class Network extends EventEmitter {
       throw new Error(`Peer ${idHex} not found`);
     }
 
-    this._graph.removeNode(idHex);
     this._graph.forEachLinkedNode(idHex, (_, link) => {
       this._destroyLink(link);
     });
+    this._graph.removeNode(idHex);
   }
 
   deleteConnection (from, to) {
@@ -148,6 +148,23 @@ export class Network extends EventEmitter {
       if (link.fromId === fromHex && link.toId === toHex) this._destroyLink(link);
       if (link.toId === fromHex && link.fromId === toHex) this._destroyLink(link);
     });
+  }
+
+  async destroy () {
+    const eosConnections = Promise.all(this.connections.map(({ stream }) => {
+      return new Promise(resolve => {
+        if (stream.destroyed) return resolve();
+        eos(stream, () => resolve());
+      });
+    }));
+
+    process.nextTick(() => {
+      this.peers.forEach(peer => {
+        this.deletePeer(peer.id);
+      });
+    });
+
+    await eosConnections;
   }
 
   _destroyLink (link) {

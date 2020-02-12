@@ -32,4 +32,8 @@ test('generate a grid topology', async () => {
   await waitForExpect(async () => {
     expect(network.connections.length).toBeLessThan(connectionLength);
   });
+
+  await network.destroy();
+  expect(network.peers.length).toBe(0);
+  expect(network.connections.length).toBe(0);
 });
