@@ -48,6 +48,14 @@ export class Network extends EventEmitter {
     this._createPeer = async (...args) => createPeer(...args);
     this._createConnection = async (...args) => createConnection(...args);
     this._graph = createGraph();
+    this._graph.on('changed', (changes) => {
+      changes.forEach(async ({ changeType, node, link }) => {
+        if (changeType === 'update') return;
+        const type = changeType === 'add' ? 'added' : 'deleted';
+        const ev = `${node ? 'peer' : 'connection'}:${type}`;
+        this.emit(ev, node ? await node.data : await link.data);
+      });
+    });
   }
 
   get graph () {
