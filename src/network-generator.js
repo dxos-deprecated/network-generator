@@ -45,20 +45,9 @@ export class Network extends EventEmitter {
 
     const { createPeer = (nodeId) => ({ id: nodeId }), createConnection = () => new PassThrough() } = options;
 
-    this._createPeer = createPeer;
-    this._createConnection = createConnection;
+    this._createPeer = async (...args) => createPeer(...args);
+    this._createConnection = async (...args) => createConnection(...args);
     this._graph = createGraph();
-
-    this._graph.on('changed', (changes) => {
-      changes.forEach(({ changeType, node, link }) => {
-        process.nextTick(() => {
-          if (changeType === 'update') return;
-          const type = changeType === 'add' ? 'added' : 'deleted';
-          const ev = `${node ? 'peer' : 'connection'}:${type}`;
-          this.emit(ev, node ? node.data : link.data);
-        });
-      });
-    });
   }
 
   get graph () {
@@ -83,19 +72,24 @@ export class Network extends EventEmitter {
     return connections;
   }
 
-  addPeer (id) {
+  async addPeer (id) {
     assert(Buffer.isBuffer(id));
 
     const peer = this._createPeer(id);
-    if (!Buffer.isBuffer(peer.id)) {
-      throw new Error('createPeer expect to return an object with an "id" buffer prop.');
-    }
 
-    this._graph.addNode(id.toString('hex'), peer);
+    const node = this._graph.addNode(id.toString('hex'), peer.then((peer) => {
+      if (!Buffer.isBuffer(peer.id)) {
+        throw new Error('createPeer expect to return an object with an "id" buffer prop.');
+      }
+
+      node.data = peer;
+      return peer;
+    }));
+
     return peer;
   }
 
-  addConnection (from, to) {
+  async addConnection (from, to) {
     assert(Buffer.isBuffer(from));
     assert(Buffer.isBuffer(to));
 
@@ -107,18 +101,23 @@ export class Network extends EventEmitter {
     const fromPeer = this._graph.getNode(fromHex);
     const toPeer = this._graph.getNode(toHex);
 
-    const connection = this._createConnection(fromPeer.data, toPeer.data) || new PassThrough();
+    const connection = (async () => (this._createConnection(await fromPeer.data, await toPeer.data) || new PassThrough()))();
 
-    if (!(typeof connection === 'object' && typeof connection.pipe === 'function')) {
-      throw new Error('createConnection expect to return a stream');
-    }
+    const link = this._graph.addLink(fromHex, toHex, connection.then(stream => {
+      if (!(typeof stream === 'object' && typeof stream.pipe === 'function')) {
+        throw new Error('createConnection expect to return a stream');
+      }
 
-    const link = this._graph.addLink(fromHex, toHex, connection);
-    eos(connection, () => {
-      this._graph.removeLink(link);
-    });
+      eos(stream, () => {
+        this._graph.removeLink(link);
+      });
 
-    return { fromPeer, toPeer, stream: connection };
+      link.data = stream;
+    }));
+
+    const stream = await connection;
+
+    return { fromPeer, toPeer, stream };
   }
 
   deletePeer (id) {
@@ -195,7 +194,7 @@ export class NetworkGenerator {
           network.addPeer(idGenerator.get(id));
         },
         addLink (from, to) {
-          return network.addConnection(idGenerator.get(from), idGenerator.get(to)).link;
+          network.addConnection(idGenerator.get(from), idGenerator.get(to));
         },
         getNodesCount () {
           return network.graph.getNodesCount();
@@ -204,8 +203,10 @@ export class NetworkGenerator {
     });
 
     topologies.forEach(topology => {
-      this[topology] = (...args) => {
+      this[topology] = async (...args) => {
         const { network } = generator[topology](...args);
+        await Promise.all(network.peers);
+        await Promise.all(network.connections.map(conn => conn.stream));
         return network;
       };
     });

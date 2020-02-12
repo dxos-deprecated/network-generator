@@ -13,7 +13,7 @@ test('generate a grid topology', async () => {
     }
   });
 
-  const network = generator.grid(10, 10);
+  const network = await generator.grid(10, 10);
   expect(network.peers.length).toBe(100);
   expect(network.connections.length).toBe(180);
   expect(network.peers[0]).toHaveProperty('name');

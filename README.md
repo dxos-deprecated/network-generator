@@ -20,19 +20,21 @@ $ npm install @dxos/network-generator
 import { NetworkGenerator } from '@dxos/network-generator';
 
 const generator = new NetworkGenerator({
-  createPeer(id) {
+  async createPeer(id) {
     // defines the peer object for the network. An "id" is required.
     return { id, name: `peer${nodeId}` };
   }
-  createConnection(peerFrom, peerTo) {
+  async createConnection(peerFrom, peerTo) {
     // do something to connect peerFrom <--> peerTo
   }
 });
 
-const network = generator.balancedBinTree(5);
+(async () => {
+  const network = await generator.balancedBinTree(5);
 
-console.log(network.peers)
-console.log(network.connections)
+  console.log(network.peers)
+  console.log(network.connections)
+})();
 ```
 
 ## API
@@ -42,10 +44,10 @@ console.log(network.connections)
 Creates a network generator instance.
 
 - `options`:
-  - `createPeer: (id: Buffer) => Object`: Defines how to create the peer object.
-  - `createConnection: (peerFrom, peerTo) => Object`: Defines how to create a connection between peerFrom and peerTo. **It can return an optional stream.**
+  - `createPeer: async (id: Buffer) => Object`: Defines how to create the peer object.
+  - `createConnection: async (peerFrom, peerTo) => Object`: Defines how to create a connection between peerFrom and peerTo. **It can return an optional stream.**
 
-#### `const network = generator.balancedBinTree(n)`
+#### `const network = await generator.balancedBinTree(n)`
 
 Creates a network using a balanced binary tree topology n levels
 
@@ -65,7 +67,7 @@ Returns an array of connections.
 
 Returns the ngraph instance.
 
-#### `network.addPeer(id) -> Peer`
+#### `await network.addPeer(id) -> Peer`
 
 Adds a new peer to the network.
 
@@ -73,7 +75,7 @@ Adds a new peer to the network.
 
 Deletes a peer from the network.
 
-#### `network.addConnection(fromId, toId) -> Connection`
+#### `await network.addConnection(fromId, toId) -> Connection`
 
 Adds a new connection to the network.
 
@@ -82,6 +84,10 @@ Adds a new connection to the network.
 #### `network.deleteConnection(fromId, toId)`
 
 Deletes a connection from the network.
+
+#### `await network.destroy()`
+
+Destroy the entire network.
 
 ## Contributing
 
