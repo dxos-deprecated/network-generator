@@ -11,7 +11,7 @@ import createGraph from 'ngraph.graph';
 import graphGenerators from 'ngraph.generators';
 import eos from 'end-of-stream';
 
-const topologies = ['ladder', 'complete', 'completeBipartite', 'balancedBinTree', 'path', 'circularLadder', 'grid', 'grid3', 'noLinks', 'cliqueCircle', 'wattsStrogatz'];
+export const topologies = ['ladder', 'complete', 'completeBipartite', 'balancedBinTree', 'path', 'circularLadder', 'grid', 'grid3', 'noLinks', 'cliqueCircle', 'wattsStrogatz'];
 
 class IdGenerator {
   constructor () {
