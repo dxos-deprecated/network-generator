@@ -71,7 +71,7 @@ Returns the ngraph instance.
 
 Adds a new peer to the network.
 
-#### `network.deletePeer(id)`
+#### `await network.deletePeer(id)`
 
 Deletes a peer from the network.
 
@@ -81,7 +81,7 @@ Adds a new connection to the network.
 
 - `Connection: { fromPeer, toPeer, stream }`
 
-#### `network.deleteConnection(fromId, toId)`
+#### `await network.deleteConnection(fromId, toId)`
 
 Deletes a connection from the network.
 

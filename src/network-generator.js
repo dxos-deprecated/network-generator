@@ -11,8 +11,38 @@ import createGraph from 'ngraph.graph';
 import graphGenerators from 'ngraph.generators';
 import eos from 'end-of-stream';
 
+/**
+ * @typedef {Object} Peer
+ * @property {Buffer} id Required peer id.
+ */
+
+/**
+ * @typedef {Object} Connection
+ * @property {Peer} fromPeer
+ * @property {Peer} toPeer
+ * @property {Stream} stream
+ */
+
+/**
+ *
+ * @callback CreatePeerCallback
+ * @param {Buffer} id Random buffer of 32 bytes to represent the id of the peer
+ * @returns {Promise<Peer>}
+ */
+
+/**
+ *
+ * @callback CreateConnectionCallback
+ * @param {Peer} fromPeer Peer initiator of the connection
+ * @param {Peer} toPeer Peer target
+ * @returns {Promise<(Stream|undefined)>}
+ */
+
 export const topologies = ['ladder', 'complete', 'completeBipartite', 'balancedBinTree', 'path', 'circularLadder', 'grid', 'grid3', 'noLinks', 'cliqueCircle', 'wattsStrogatz'];
 
+/**
+ * Class helper to generate random buffer ids based on a number.
+ */
 class IdGenerator {
   constructor () {
     this._ids = new Map();
@@ -37,13 +67,13 @@ export class Network extends EventEmitter {
   /**
    * @constructor
    * @param {Object} options
-   * @param {Function} options.createPeer
-   * @param {Function} options.createConnection
+   * @param {CreatePeerCallback} options.createPeer
+   * @param {CreateConnectionCallback} options.createConnection
    */
   constructor (options = {}) {
     super();
 
-    const { createPeer = (nodeId) => ({ id: nodeId }), createConnection = () => new PassThrough() } = options;
+    const { createPeer = id => ({ id }), createConnection = () => new PassThrough() } = options;
 
     this._createPeer = async (...args) => createPeer(...args);
     this._createConnection = async (...args) => createConnection(...args);
@@ -58,10 +88,16 @@ export class Network extends EventEmitter {
     });
   }
 
+  /**
+   * @type {Ngraph}
+   */
   get graph () {
     return this._graph;
   }
 
+  /**
+   * @type {Peer[]}
+   */
   get peers () {
     const peers = [];
     this._graph.forEachNode(node => {
@@ -70,6 +106,9 @@ export class Network extends EventEmitter {
     return peers;
   }
 
+  /**
+   * @type {Connection[]}
+   */
   get connections () {
     const connections = [];
     this._graph.forEachLink(link => {
@@ -80,6 +119,12 @@ export class Network extends EventEmitter {
     return connections;
   }
 
+  /**
+   * Add a new peer to the network
+   *
+   * @param {Buffer} id
+   * @returns {Promise<Peer>}
+   */
   async addPeer (id) {
     assert(Buffer.isBuffer(id));
 
@@ -87,7 +132,7 @@ export class Network extends EventEmitter {
 
     const node = this._graph.addNode(id.toString('hex'), peer.then((peer) => {
       if (!Buffer.isBuffer(peer.id)) {
-        throw new Error('createPeer expect to return an object with an "id" buffer prop.');
+        throw new Error('createPeer expect to return an object with an "id" buffer prop');
       }
 
       node.data = peer;
@@ -97,12 +142,23 @@ export class Network extends EventEmitter {
     return peer;
   }
 
+  /**
+   * Add a new connection to the network
+   *
+   * @param {Buffer} from
+   * @param {Buffer} to
+   * @returns {Promise<Connection>}
+   */
   async addConnection (from, to) {
     assert(Buffer.isBuffer(from));
     assert(Buffer.isBuffer(to));
 
     const fromHex = from.toString('hex');
     const toHex = to.toString('hex');
+
+    if (this._graph.hasLink(fromHex, toHex)) {
+      throw new Error(`Connection ${fromHex.slice(0, 6)} -> ${toHex.slice(0, 6)} exists`);
+    }
 
     if (!this._graph.hasNode(fromHex)) this.addPeer(from);
     if (!this._graph.hasNode(toHex)) this.addPeer(to);
@@ -128,6 +184,12 @@ export class Network extends EventEmitter {
     return { fromPeer, toPeer, stream };
   }
 
+  /**
+   * Delete a peer
+   *
+   * @param {Buffer} id
+   * @returns {Promise}
+   */
   deletePeer (id) {
     assert(Buffer.isBuffer(id));
 
@@ -137,46 +199,56 @@ export class Network extends EventEmitter {
       throw new Error(`Peer ${idHex} not found`);
     }
 
+    const promises = [];
     this._graph.forEachLinkedNode(idHex, (_, link) => {
-      this._destroyLink(link);
+      promises.push(this._destroyLink(link));
     });
     this._graph.removeNode(idHex);
+    return Promise.all(promises);
   }
 
+  /**
+   * Delete a connection
+   *
+   * @param {Buffer} from
+   * @param {Buffer} to
+   * @returns {Promise}
+   */
   deleteConnection (from, to) {
     const fromHex = from.toString('hex');
     const toHex = to.toString('hex');
 
+    const promises = [];
     this._graph.forEachLinkedNode(fromHex, (_, link) => {
-      if (link.fromId === fromHex && link.toId === toHex) this._destroyLink(link);
-      if (link.toId === fromHex && link.fromId === toHex) this._destroyLink(link);
+      if (link.fromId === fromHex && link.toId === toHex) {
+        promises.push(this._destroyLink(link));
+      }
     });
-    this._graph.forEachLinkedNode(toHex, (_, link) => {
-      if (link.fromId === fromHex && link.toId === toHex) this._destroyLink(link);
-      if (link.toId === fromHex && link.fromId === toHex) this._destroyLink(link);
-    });
+
+    return Promise.all(promises);
   }
 
+  /**
+   * Destroy all the peers and connections related
+   *
+   * @returns {Promise}
+   */
   async destroy () {
-    const eosConnections = Promise.all(this.connections.map(({ stream }) => {
-      return new Promise(resolve => {
-        if (stream.destroyed) return resolve();
-        eos(stream, () => resolve());
-      });
-    }));
-
-    process.nextTick(() => {
-      this.peers.forEach(peer => {
-        this.deletePeer(peer.id);
-      });
+    const promises = [];
+    this.peers.forEach(peer => {
+      promises.push(this.deletePeer(peer.id));
     });
 
-    await eosConnections;
+    return Promise.all(promises);
   }
 
-  _destroyLink (link) {
+  async _destroyLink (link) {
     if (!link.data.destroyed) {
+      const p = new Promise(resolve => eos(link.data, () => {
+        resolve();
+      }));
       link.data.destroy();
+      return p;
     }
   }
 }
@@ -189,8 +261,8 @@ export class NetworkGenerator {
   /**
    * @constructor
    * @param {Object} options
-   * @param {Function} options.createPeer
-   * @param {Function} options.createConnection
+   * @param {CreatePeerCallback} options.createPeer
+   * @param {CreateConnectionCallback} options.createConnection
    */
   constructor (options = {}) {
     const generator = graphGenerators.factory(() => {
