@@ -52,7 +52,7 @@ export class Network extends EventEmitter {
       changes.forEach(async ({ changeType, node, link }) => {
         if (changeType === 'update') return;
         const type = changeType === 'add' ? 'added' : 'deleted';
-        const ev = `${node ? 'peer' : 'connection'}:${type}`;
+        const ev = `${node ? 'peer' : 'connection'}-${type}`;
         this.emit(ev, node ? await node.data : await link.data);
       });
     });
