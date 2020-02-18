@@ -45,7 +45,7 @@ Creates a network generator instance.
 
 - `options`:
   - `createPeer: async (id: Buffer) => Object`: Defines how to create the peer object.
-  - `createConnection: async (peerFrom, peerTo) => Object`: Defines how to create a connection between peerFrom and peerTo. **It can return an optional stream.**
+  - `createConnection: async (peerFrom, peerTo) => Stream`: Defines how to create a connection between peerFrom and peerTo. **It can return an optional stream.**
 
 #### `const network = await generator.balancedBinTree(n)`
 
