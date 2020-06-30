@@ -160,21 +160,18 @@ export class Network extends EventEmitter {
    * @param {Buffer} to
    * @returns {Promise<Connection>}
    */
-  async addConnection (from, to) {
+  async addConnection (from, to, conn) {
     assert(Buffer.isBuffer(from));
     assert(Buffer.isBuffer(to));
 
     const fromHex = from.toString('hex');
     const toHex = to.toString('hex');
+    const id = `${fromHex}-${toHex}-${crypto.randomBytes(6).toString('hex')}`;
 
-    if (this._connectionsOpening.has(fromHex + toHex)) {
-      throw new Error(`Connection ${fromHex.slice(0, 6)} -> ${toHex.slice(0, 6)} exists`);
-    }
-
-    const connection = this._addConnection(from, to).finally(() => {
-      this._connectionsOpening.delete(fromHex + toHex);
+    const connection = this._addConnection(from, to, conn).finally(() => {
+      this._connectionsOpening.delete(id);
     });
-    this._connectionsOpening.set(fromHex + toHex, connection);
+    this._connectionsOpening.set(id, connection);
     return connection;
   }
 
@@ -236,18 +233,14 @@ export class Network extends EventEmitter {
     return Promise.all(promises);
   }
 
-  async _addConnection (from, to) {
+  async _addConnection (from, to, conn) {
     const fromHex = from.toString('hex');
     const toHex = to.toString('hex');
-
-    if (this._graph.hasLink(fromHex, toHex)) {
-      throw new Error(`Connection ${fromHex.slice(0, 6)} -> ${toHex.slice(0, 6)} exists`);
-    }
 
     const fromPeer = await this._getPeerOrCreate(from);
     const toPeer = await this._getPeerOrCreate(to);
 
-    const connection = (async () => (this._createConnection(fromPeer, toPeer) || new PassThrough()))()
+    const connection = (async () => (conn || this._createConnection(fromPeer, toPeer) || new PassThrough()))()
       .then(stream => {
         if (!(typeof stream === 'object' && typeof stream.pipe === 'function')) {
           throw new Error('createConnection expect to return a stream');
