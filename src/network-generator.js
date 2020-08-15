@@ -128,6 +128,18 @@ export class Network extends EventEmitter {
   }
 
   /**
+   * Add a new peer supplied by the caller to the network
+   *
+   * @param {Peer} peer
+   */
+  // TOOD(dboreham): better method name?
+  insertPeer (peer) {
+    assert(peer);
+    assert(Buffer.isBuffer(peer.id));
+    this._graph.addNode(peer.id.toString('hex'), peer);
+  }
+
+  /**
    * Add a new peer to the network
    *
    * @param {Buffer} id
