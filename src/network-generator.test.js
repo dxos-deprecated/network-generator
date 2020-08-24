@@ -2,6 +2,7 @@
 // Copyright 2020 DxOS.
 //
 
+import crypto from 'crypto';
 import { PassThrough } from 'stream';
 import { NetworkGenerator } from './network-generator';
 import waitForExpect from 'wait-for-expect';
@@ -61,5 +62,45 @@ test('generate a balancedBinTree of 2 n', async () => {
   const network = await generator.balancedBinTree(2);
   expect(network.peers.length).toBe(7);
   expect(network.connections.length).toBe(6);
+  await genericTest(network);
+});
+
+test('insert pre-made peers', async () => {
+  let createPeerCalledCount = 0;
+  const generator = new NetworkGenerator({
+    createPeer (id) {
+      createPeerCalledCount++;
+      return { id, name: `peer${id}` };
+    },
+    createConnection (fromPeer, toPeer) {
+      return new PassThrough();
+    }
+  });
+
+  generator.on('error', err => console.log(err));
+
+  const network = await generator.noLinks();
+  expect(network.peers.length).toBe(0);
+  expect(network.connections.length).toBe(0);
+
+  // genericTest above doesn't work for less than three peers so we add three.
+  const id1 = crypto.randomBytes(32);
+  const id2 = crypto.randomBytes(32);
+  const id3 = crypto.randomBytes(32);
+  const peer1 = { id: id1, name: `insertedPeer${id1}` };
+  const peer2 = { id: id2, name: `insertedPeer${id2}` };
+  const peer3 = { id: id3, name: `insertedPeer${id2}` };
+  network.insertPeer(peer1);
+  network.insertPeer(peer2);
+  network.insertPeer(peer3);
+
+  expect(network.peers.length).toBe(3);
+  expect(network.connections.length).toBe(0);
+
+  await network.addConnection(id1, id2);
+  await network.addConnection(id1, id3);
+  expect(network.connections.length).toBe(2);
+
+  expect(createPeerCalledCount).toBe(0);
   await genericTest(network);
 });
